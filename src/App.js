@@ -1,6 +1,10 @@
+// src/App.js
+
 import React, { useRef, useState } from "react";
 import { QuadTree } from "./QuadTree";
 import MapView from "./MapView";
+import { MapContainer } from "react-leaflet"; // Import MapContainer
+import L from "leaflet"; // Import Leaflet
 import "./styles.css";
 
 export default function App() {
@@ -114,9 +118,17 @@ export default function App() {
 
   return (
     <div className="app-container">
-      <div className="map-container">
+      <MapContainer
+        center={[0, 0]}
+        zoom={2}
+        style={{ height: "100%", width: "100%" }}
+        minZoom={1}
+        maxZoom={20}
+        worldCopyJump={true}
+        crs={L.CRS.EPSG3857} // Use Leaflet's CRS
+      >
         <MapView quadTree={quadTreeRef.current} onMapClick={handleMapClick} />
-      </div>
+      </MapContainer>
       <div className="controls">
         <button onClick={handleExport}>Export QuadTree</button>
         <input type="file" accept=".json" onChange={handleImport} />

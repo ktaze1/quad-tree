@@ -1,27 +1,30 @@
+/* src/styles.css */
+
+body,
+html,
+#root {
+  height: 100%;
+  margin: 0;
+  padding: 0;
+}
+
 .app-container {
-    display: flex;
-    flex-direction: row;
-    height: 100%;
-    margin: 0;
-  }
-  
-  .map-container {
-    flex: 1;
-    position: relative;
-  }
-  
-  .controls {
-    width: 200px;
-    background: #f9f9f9;
-    border-left: 1px solid #ccc;
-    display: flex;
-    flex-direction: column;
-    padding: 1rem;
-    align-items: flex-start;
-  }
-  
-  button {
-    margin-bottom: 1rem;
-    cursor: pointer;
-  }
-  
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+}
+
+.map-container {
+  flex: 1;
+}
+
+.controls {
+  padding: 10px;
+  background-color: #f0f0f0;
+  text-align: center;
+}
+
+.controls button,
+.controls input {
+  margin: 5px;
+}

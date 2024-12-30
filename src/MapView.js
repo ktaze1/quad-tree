@@ -1,19 +1,53 @@
-import React from "react";
-import { MapContainer, TileLayer, Rectangle, useMapEvents } from "react-leaflet";
-import L from "leaflet";
+// src/MapView.js
 
-function MapClickHandler({ onMapClick }) {
+import React, { useEffect, useState } from "react";
+import {
+  TileLayer,
+  Rectangle,
+  useMapEvents,
+  useMap,
+} from "react-leaflet";
+import L from "leaflet";
+import useDebounce from "./hooks/useDebounce"; // Import the debounce hook
+
+/**
+ * Custom hook to get the current map bounds
+ * @returns {Object} - Current map bounds with north, south, west, east
+ */
+function useMapBounds() {
+  const map = useMap();
+  const [bounds, setBounds] = useState(map.getBounds());
+
   useMapEvents({
-    click(e) {
-      onMapClick(e.latlng);
+    moveend: () => {
+      setBounds(map.getBounds());
+    },
+    zoomend: () => {
+      setBounds(map.getBounds());
     },
   });
-  return null;
+
+  return {
+    north: bounds.getNorth(),
+    south: bounds.getSouth(),
+    west: bounds.getWest(),
+    east: bounds.getEast(),
+  };
 }
 
 export default function MapView({ quadTree, onMapClick }) {
-  // Render all quads as rectangles for demonstration
-  const rectangles = Object.keys(quadTree.nodes).map((path) => {
+  const rawBounds = useMapBounds();
+  const debouncedBounds = useDebounce(rawBounds, 300); // Debounce by 300ms
+  const [visibleQuads, setVisibleQuads] = useState([]);
+
+  useEffect(() => {
+    // Query the QuadTree for quads within the debounced map bounds
+    const quads = quadTree.queryRange(debouncedBounds);
+    setVisibleQuads(quads);
+  }, [debouncedBounds, quadTree]);
+
+  // Render only the visible quads
+  const rectangles = visibleQuads.map((path) => {
     const node = quadTree.nodes[path];
     if (!node) return null;
 
@@ -23,7 +57,7 @@ export default function MapView({ quadTree, onMapClick }) {
       [south, east],
     ];
 
-    // We'll style leaves differently from internal nodes
+    // Style leaves differently from internal nodes
     const color = node.isLeaf ? "blue" : "red";
 
     return (
@@ -36,21 +70,26 @@ export default function MapView({ quadTree, onMapClick }) {
   });
 
   return (
-    <MapContainer
-      center={[0, 0]}
-      zoom={2}
-      style={{ height: "100%", width: "100%" }}
-      minZoom={1}
-      maxZoom={7}
-      worldCopyJump={true}
-      crs={L.CRS.EPSG3857}
-    >
+    <>
       <TileLayer
         attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       <MapClickHandler onMapClick={onMapClick} />
       {rectangles}
-    </MapContainer>
+    </>
   );
+}
+
+/**
+ * Component to handle map click events
+ * @param {Function} onMapClick - Callback function when the map is clicked
+ */
+function MapClickHandler({ onMapClick }) {
+  useMapEvents({
+    click(e) {
+      onMapClick(e.latlng);
+    },
+  });
+  return null;
 }
