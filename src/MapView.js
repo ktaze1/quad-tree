@@ -2,9 +2,6 @@ import React from "react";
 import { MapContainer, TileLayer, Rectangle, useMapEvents } from "react-leaflet";
 import L from "leaflet";
 
-/**
- * Custom hook-like component to handle map clicks.
- */
 function MapClickHandler({ onMapClick }) {
   useMapEvents({
     click(e) {
@@ -15,7 +12,7 @@ function MapClickHandler({ onMapClick }) {
 }
 
 export default function MapView({ quadTree, onMapClick }) {
-  // Create a Rectangle for each node in the quadTree
+  // Render all quads as rectangles for demonstration
   const rectangles = Object.keys(quadTree.nodes).map((path) => {
     const node = quadTree.nodes[path];
     if (!node) return null;
@@ -26,7 +23,7 @@ export default function MapView({ quadTree, onMapClick }) {
       [south, east],
     ];
 
-    // Leaves in one color, internals in another
+    // We'll style leaves differently from internal nodes
     const color = node.isLeaf ? "blue" : "red";
 
     return (
@@ -43,12 +40,14 @@ export default function MapView({ quadTree, onMapClick }) {
       center={[0, 0]}
       zoom={2}
       style={{ height: "100%", width: "100%" }}
-      crs={L.CRS.EPSG3857}
+      minZoom={1}
+      maxZoom={7}
       worldCopyJump={true}
+      crs={L.CRS.EPSG3857}
     >
       <TileLayer
+        attribution='&copy; <a href="http://osm.org/copyright">OpenStreetMap</a>'
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-        attribution="&copy; OpenStreetMap contributors"
       />
       <MapClickHandler onMapClick={onMapClick} />
       {rectangles}

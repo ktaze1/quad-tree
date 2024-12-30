@@ -4,105 +4,110 @@ import MapView from "./MapView";
 import "./styles.css";
 
 export default function App() {
-  // Keep QuadTree in a ref so it’s not recreated on every render
+  // We store the QuadTree in a ref so it persists across re-renders
   const quadTreeRef = useRef(new QuadTree());
   const [refreshCount, setRefreshCount] = useState(0);
 
+  // Set maximum depth to 20
+  const MAX_DEPTH = 20;
+
   /**
-   * Find which leaf path the clicked lat/lng belongs to,
-   * then subdivide that leaf. Force re-render so we see changes.
+   * Handle map click events to subdivide the QuadTree
+   * @param {Object} latlng - The latitude and longitude of the click event
    */
   function handleMapClick(latlng) {
     const path = findLeafPath(latlng);
     quadTreeRef.current.subdivide(path);
+    // Force a re-render by updating the refresh count
     setRefreshCount((c) => c + 1);
   }
 
   /**
-   * Naive function to find the path of the leaf containing the given latlng.
-   * We'll go up to some max depth. If we reach a leaf or max depth, we stop.
+   * Find the path to the leaf node corresponding to the clicked location
+   * @param {Object} latlng - The latitude and longitude of the click event
+   * @returns {string} - The path string representing the leaf node
    */
   function findLeafPath(latlng) {
     let path = "";
-    const quadTree = quadTreeRef.current;
-    let node = quadTree.nodes[path];
+    let depth = 0;
+    let node = quadTreeRef.current.nodes[path];
+    let { north, south, west, east } = quadTreeRef.current.bounds;
 
-    // Start with world bounds
-    let { north, south, west, east } = quadTree.bounds;
-    const maxDepth = 10;
-
-    for (let d = 0; d < maxDepth; d++) {
+    while (depth < MAX_DEPTH) {
       if (!node || node.isLeaf) {
-        // If we found a leaf or there's no node, return current path
+        // Found a leaf or empty node
         return path;
       }
 
       const midLat = (north + south) / 2;
       const midLng = (west + east) / 2;
 
-      // 0 => top (lat >= midLat), 1 => bottom (lat < midLat)
-      // 0 => left (lng < midLng), 1 => right (lng >= midLng)
-      // But we want to match the bits "00", "01", "10", "11"
-      // We'll do top-left => "00", top-right => "01", bottom-left => "10", bottom-right => "11"
+      // Determine which quadrant the latlng belongs to
+      const verticalBit = latlng.lat >= midLat ? "0" : "1"; // Top or Bottom
+      const horizontalBit = latlng.lng >= midLng ? "1" : "0"; // Right or Left
 
-      let bits = "";
-      if (latlng.lat >= midLat && latlng.lng < midLng) {
-        // top-left => "00"
-        bits = "00";
-        // Update bounds
+      // The new child path is verticalBit + horizontalBit
+      const childSuffix = verticalBit + horizontalBit;
+      const childPath = path + childSuffix;
+
+      // Update bounding box based on the quadrant
+      if (childSuffix === "00") {
+        // Top-Left
         east = midLng;
         south = midLat;
-      } else if (latlng.lat >= midLat && latlng.lng >= midLng) {
-        // top-right => "01"
-        bits = "01";
+      } else if (childSuffix === "01") {
+        // Top-Right
         west = midLng;
         south = midLat;
-      } else if (latlng.lat < midLat && latlng.lng < midLng) {
-        // bottom-left => "10"
-        bits = "10";
+      } else if (childSuffix === "10") {
+        // Bottom-Left
         north = midLat;
         east = midLng;
-      } else {
-        // bottom-right => "11"
-        bits = "11";
+      } else if (childSuffix === "11") {
+        // Bottom-Right
         west = midLng;
         north = midLat;
       }
 
-      path += bits;
-      node = quadTree.nodes[path];
+      // Move deeper into the QuadTree
+      path = childPath;
+      node = quadTreeRef.current.nodes[childPath];
+      depth += 1;
     }
 
     return path;
   }
 
   /**
-   * Export the entire QuadTree to JSON file
+   * Export the current QuadTree structure as a JSON file
    */
   function handleExport() {
-    const jsonStr = quadTreeRef.current.export();
+    const quadTree = quadTreeRef.current;
+    const jsonStr = quadTree.export();
+
     const blob = new Blob([jsonStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
-
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "quadtree_export.json";
-    a.click();
-
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = "quadtree_export.json";
+    link.click();
     URL.revokeObjectURL(url);
   }
 
   /**
-   * Import the QuadTree from a JSON file
+   * Import a QuadTree structure from a JSON file
+   * @param {Event} e - The file input change event
    */
   function handleImport(e) {
     const file = e.target.files[0];
     if (!file) return;
+
     const reader = new FileReader();
-    reader.onload = (evt) => {
+    reader.onload = function (evt) {
       const data = evt.target.result;
       quadTreeRef.current.import(data);
-      setRefreshCount((c) => c + 1); // re-render
+      // Force a re-render by updating the refresh count
+      setRefreshCount((c) => c + 1);
     };
     reader.readAsText(file);
   }
@@ -110,10 +115,7 @@ export default function App() {
   return (
     <div className="app-container">
       <div className="map-container">
-        <MapView
-          quadTree={quadTreeRef.current}
-          onMapClick={handleMapClick}
-        />
+        <MapView quadTree={quadTreeRef.current} onMapClick={handleMapClick} />
       </div>
       <div className="controls">
         <button onClick={handleExport}>Export QuadTree</button>
