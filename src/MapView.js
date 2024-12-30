@@ -1,22 +1,12 @@
-// src/MapView.js
-
 import React, { useEffect, useState } from "react";
-import {
-  TileLayer,
-  Rectangle,
-  useMapEvents,
-  useMap,
-} from "react-leaflet";
+import { TileLayer, Rectangle, useMapEvents, useMap } from "react-leaflet";
 import L from "leaflet";
 import useDebounce from "./hooks/useDebounce"; // Import the debounce hook
 
-/**
- * Custom hook to get the current map bounds
- * @returns {Object} - Current map bounds with north, south, west, east
- */
 function useMapBounds() {
   const map = useMap();
   const [bounds, setBounds] = useState(map.getBounds());
+  const [zoom, setZoom] = useState(map.getZoom()); // Track zoom level
 
   useMapEvents({
     moveend: () => {
@@ -24,29 +14,37 @@ function useMapBounds() {
     },
     zoomend: () => {
       setBounds(map.getBounds());
+      setZoom(map.getZoom());
     },
   });
 
   return {
-    north: bounds.getNorth(),
-    south: bounds.getSouth(),
-    west: bounds.getWest(),
-    east: bounds.getEast(),
+    bounds: {
+      north: bounds.getNorth(),
+      south: bounds.getSouth(),
+      west: bounds.getWest(),
+      east: bounds.getEast(),
+    },
+    zoom,
   };
 }
 
 export default function MapView({ quadTree, onMapClick }) {
   const rawBounds = useMapBounds();
-  const debouncedBounds = useDebounce(rawBounds, 300); // Debounce by 300ms
+  const debouncedBounds = useDebounce(rawBounds.bounds, 300); // Debounce bounds update
+  const zoomLevel = rawBounds.zoom;
   const [visibleQuads, setVisibleQuads] = useState([]);
 
   useEffect(() => {
-    // Query the QuadTree for quads within the debounced map bounds
+    // Calculate the maximum depth to render
+    const maxDepth = Math.min(5 + zoomLevel, 20); // Render deeper quads as the zoom level increases
     const quads = quadTree.queryRange(debouncedBounds);
-    setVisibleQuads(quads);
-  }, [debouncedBounds, quadTree]);
 
-  // Render only the visible quads
+    // Filter quads to only include nodes up to the max depth
+    const filteredQuads = quads.filter((path) => path.length / 2 <= maxDepth);
+    setVisibleQuads(filteredQuads);
+  }, [debouncedBounds, zoomLevel, quadTree]);
+
   const rectangles = visibleQuads.map((path) => {
     const node = quadTree.nodes[path];
     if (!node) return null;
@@ -81,10 +79,6 @@ export default function MapView({ quadTree, onMapClick }) {
   );
 }
 
-/**
- * Component to handle map click events
- * @param {Function} onMapClick - Callback function when the map is clicked
- */
 function MapClickHandler({ onMapClick }) {
   useMapEvents({
     click(e) {
